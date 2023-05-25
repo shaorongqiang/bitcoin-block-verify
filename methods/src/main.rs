@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{env, io, io::Write};
+use std::{env, io, io::Write, path::Path, time::Duration};
 
-use bonsai_starter_methods::guest_list::GUEST_LIST;
+use anyhow::{Context, Result};
+use bonsai_starter_methods::guest_list::{GuestEntry, GUEST_LIST};
 use clap::Parser;
-use risc0_zkvm::{Executor, ExecutorEnv};
+use risc0_recursion::SessionRollupReceipt;
+use risc0_zkvm::{serde::to_vec, Executor, ExecutorEnv};
 
 /// Runs the RISC-V ELF binary.
 #[derive(Parser)]
@@ -29,6 +31,51 @@ struct Args {
     input: Option<String>,
 }
 
+fn prove_locally(guest_entry: &GuestEntry, input: Vec<u8>) -> Vec<u8> {
+    let env = ExecutorEnv::builder()
+        .add_input(&to_vec(&input).expect("Failed to vectorize data"))
+        .build();
+    let mut exec =
+        Executor::from_elf(env, guest_entry.elf).expect("Failed to instantiate executor");
+    let session = exec.run().expect("Failed to run executor");
+    // Locally prove resulting journal
+    if env::var("PROVE_LOCALLY").is_ok() {
+        session.prove().expect("Failed to prove session");
+    }
+    session.journal
+}
+
+fn prove_remote(guest_entry: &GuestEntry, input: Vec<u8>) -> Result<Vec<u8>> {
+    let client =
+        bonsai_sdk::Client::from_env().context("Failed to initialize bonsai from env vars")?;
+    let elf_path = Path::new(guest_entry.path);
+    let img_id = client.upload_img_file(elf_path)?;
+    let input_id = client.upload_input(input)?;
+    let session = client.create_session(img_id, input_id)?;
+
+    loop {
+        let res = session.status(&client)?;
+        if res.status == "RUNNING" {
+            std::thread::sleep(Duration::from_secs(15));
+            continue;
+        }
+        if res.status == "SUCCEEDED" {
+            let receipt_url = res
+                .receipt_url
+                .context("API error, missing receipt on completed session")?;
+
+            let receipt_buf = client.download(&receipt_url)?;
+            let receipt: SessionRollupReceipt = bincode::deserialize(&receipt_buf)?;
+            receipt
+                .verify(guest_entry.image_id)
+                .context("Receipt verification failed")?;
+            return Ok(receipt.journal);
+        } else {
+            panic!("Workflow exited: {}", res.status);
+        }
+    }
+}
+
 pub fn main() {
     // Parse arguments
     let args = Args::parse();
@@ -39,29 +86,28 @@ pub fn main() {
             Err(_) => [0u8; 32],
         };
     let guest_entry = GUEST_LIST
-        .into_iter()
+        .iter()
         .find(|entry| {
-            entry.name == &args.guest_binary.to_uppercase()
+            entry.name == args.guest_binary.to_uppercase()
                 || bytemuck::cast::<[u32; 8], [u8; 32]>(entry.image_id) == potential_guest_image_id
         })
         .expect("Unknown guest binary");
+
     // Execute or return image id
     let output_bytes = match &args.input {
         Some(input) => {
             let input = hex::decode(&input[2..]).expect("Failed to decode image id");
-            let env = ExecutorEnv::builder().add_input(&input).build();
-            let mut exec =
-                Executor::from_elf(env, guest_entry.elf).expect("Failed to instantiate executor");
-            let session = exec.run().expect("Failed to run executor");
-            // Locally prove resulting journal
-            if env::var("PROVE_LOCALLY").is_ok() {
-                session.prove().expect("Failed to prove session");
+            let input = bincode::serialize(&input).expect("Failed to serialize data");
+
+            if env::var("BONSAI_ENDPOINT").is_ok() {
+                prove_remote(guest_entry, input).expect("Failed to run proof with bonsai")
+            } else {
+                prove_locally(guest_entry, input)
             }
-            session.journal
         }
         None => Vec::from(bytemuck::cast::<[u32; 8], [u8; 32]>(guest_entry.image_id)),
     };
-    let output = hex::encode(&output_bytes);
+    let output = hex::encode(output_bytes);
     print!("{output}");
     io::stdout().flush().unwrap();
 }

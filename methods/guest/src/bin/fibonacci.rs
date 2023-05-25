@@ -13,10 +13,8 @@
 // limitations under the License.
 
 #![no_main]
-#![no_std]
 
-use ethabi::ethereum_types::U256;
-use ethabi::{ParamType, Token};
+use ethabi::{ethereum_types::U256, ParamType, Token};
 use risc0_zkvm::guest::env;
 
 risc0_zkvm::guest::entry!(main);
@@ -29,12 +27,10 @@ fn fibonacci(n: U256) -> U256 {
     return curr;
 }
 
-const INPUT_LEN: usize = core::mem::size_of::<U256>();
-
 pub fn main() {
-    // NOTE: Reads must be of known length. https://github.com/risc0/risc0/issues/402
-    let mut input_bytes = [0u8; INPUT_LEN];
-    env::read_slice(&mut input_bytes);
+    let data: Vec<u8> = env::read();
+    let input_bytes: Vec<u8> = bincode::deserialize(&data).expect("Failed to deserialize input");
+
     let input = ethabi::decode_whole(&[ParamType::Uint(256)], &input_bytes).unwrap();
     let n: U256 = input[0].clone().into_uint().unwrap();
 
