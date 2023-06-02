@@ -39,4 +39,5 @@ pub fn main() {
 
     // Commit the journal that will be decoded in the application contract.
     env::commit_slice(&ethabi::encode(&[Token::Uint(n), Token::Uint(result)]));
+    // env::log("");
 }
