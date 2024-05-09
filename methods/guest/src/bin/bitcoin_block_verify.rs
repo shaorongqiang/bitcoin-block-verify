@@ -9,10 +9,10 @@ use risc0_zkvm::guest::env;
 risc0_zkvm::guest::entry!(main);
 
 fn main() {
-    let data: Vec<u8> = env::read();
-    let headers = HeaderArray::new(&data).unwrap();
+    let data: (u64, Vec<u8>) = env::read();
+    let headers = HeaderArray::new(&data.1).unwrap();
     validate_header_chain(&headers, true).unwrap();
     let raw_header = headers.index(headers.len() - 1);
-    let ret = raw_header.digest().as_ref().clone();
+    let ret = (data.0, raw_header.digest().as_ref().clone());
     env::commit(&ret);
 }

@@ -1,7 +1,6 @@
-use bitcoin::{hashes::Hash, BlockHash};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use methods::{BITCOIN_BLOCK_VERIFY_ELF, BITCOIN_BLOCK_VERIFY_ID};
-use risc0_zkvm::{default_prover, ExecutorEnv};
+use risc0_zkvm::{default_prover, sha::Digestible, ExecutorEnv};
 
 fn main() {
     env_logger::init();
@@ -17,7 +16,7 @@ fn main() {
         let client = Client::new(url, auth).unwrap();
 
         let begin = 10;
-        let end = 13;
+        let end = 15;
         for height in begin..=end {
             let header = client
                 .get_block_hash(height)
@@ -26,7 +25,7 @@ fn main() {
             let data = hex::decode(&header).unwrap();
             input.extend_from_slice(&data[..80]);
         }
-        input
+        (end, input)
     };
 
     let env = ExecutorEnv::builder()
@@ -39,8 +38,18 @@ fn main() {
 
     let receipt = prover.prove(env, BITCOIN_BLOCK_VERIFY_ELF).unwrap();
 
-    let ret = receipt.journal.decode::<[u8; 32]>().unwrap();
-    println!("output: {}", BlockHash::from_byte_array(ret));
+    let (height, hash) = receipt.journal.decode::<(u64, [u8; 32])>().unwrap();
+    println!("output: {} 0x{}", height, hex::encode(hash));
 
     receipt.verify(BITCOIN_BLOCK_VERIFY_ID).unwrap();
+    println!(
+        "postStateDigest:{}",
+        receipt
+            .get_claim()
+            .unwrap()
+            .post
+            .as_value()
+            .unwrap()
+            .digest()
+    );
 }

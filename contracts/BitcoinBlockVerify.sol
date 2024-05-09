@@ -16,7 +16,7 @@
 
 pragma solidity ^0.8.20;
 
-import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
+import {IRiscZeroVerifier} from "./IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol"; // auto-generated contract after running `cargo build`.
 
 /// @title A starter application using RISC Zero.
@@ -37,7 +37,7 @@ contract BitcoinBlockVerify {
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     constructor(IRiscZeroVerifier _verifier) {
         verifier = _verifier;
-        number = 0;
+        height = 0;
     }
 
     /// @notice Set the even number stored on the contract. Requires a RISC Zero proof that the number is even.
@@ -54,10 +54,5 @@ contract BitcoinBlockVerify {
         );
         height = height_;
         block_hash = hash_;
-    }
-
-    /// @notice Returns the number stored.
-    function get() public view returns (uint256) {
-        return number;
     }
 }
