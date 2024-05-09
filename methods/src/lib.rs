@@ -31,7 +31,9 @@ mod tests {
             .unwrap();
 
         // NOTE: Use the executor to run tests without proving.
-        let session_info = default_executor().execute(env, super::IS_EVEN_ELF).unwrap();
+        let session_info = default_executor()
+            .execute(env, super::BITCOIN_BLOCK_VERIFY_ELF)
+            .unwrap();
 
         let x = U256::abi_decode(&session_info.journal.bytes, true).unwrap();
         assert_eq!(x, even_number);
@@ -48,6 +50,8 @@ mod tests {
             .unwrap();
 
         // NOTE: Use the executor to run tests without proving.
-        default_executor().execute(env, super::IS_EVEN_ELF).unwrap();
+        default_executor()
+            .execute(env, super::BITCOIN_BLOCK_VERIFY_ELF)
+            .unwrap();
     }
 }

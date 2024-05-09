@@ -4,15 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "is-even"
-path = "src/bin/is_even.rs"
+name = "bitcoin-block-verify"
+path = "src/bin/bitcoin_block_verify.rs"
 
 [workspace]
 
 [dependencies]
-alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
-alloy-sol-types = { version = "0.6" }
-risc0-zkvm = {  version = "0.21", default-features = false, features = ['std'] }
+bitcoin-spv = { version = "5.0.0", default-features = false }
+risc0-zkvm = {  version = "0.21", default-features = false }
 
 [profile.release]
 lto = "thin"
