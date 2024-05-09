@@ -10,9 +10,10 @@ path = "src/bin/bitcoin_block_verify.rs"
 [workspace]
 
 [dependencies]
-ethabi = "18.0.0"
+alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
+alloy-sol-types = { version = "0.6" }
 bitcoin-spv = { version = "5.0.0", default-features = false }
-risc0-zkvm = {  version = "0.21", default-features = false }
+risc0-zkvm = {  version = "0.21", default-features = false, features = ['std'] }
 
 [profile.release]
 lto = "thin"
