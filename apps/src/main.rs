@@ -1,3 +1,5 @@
+use std::env::set_var;
+
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use methods::{BITCOIN_BLOCK_VERIFY_ELF, BITCOIN_BLOCK_VERIFY_ID};
 use risc0_zkvm::{default_prover, sha::Digestible, ExecutorEnv};
@@ -34,9 +36,12 @@ fn main() {
         .build()
         .unwrap();
 
+    //set_var("RISC0_PROVER", "ipc");
     let prover = default_prover();
+    //println!("{}", prover.get_name());
 
     let receipt = prover.prove(env, BITCOIN_BLOCK_VERIFY_ELF).unwrap();
+    //println!("{:?}", receipt);
 
     let (height, hash) = receipt.journal.decode::<(u64, [u8; 32])>().unwrap();
     println!("output: {} 0x{}", height, hex::encode(hash));
@@ -52,4 +57,14 @@ fn main() {
             .unwrap()
             .digest()
     );
+    match receipt.inner {
+        risc0_zkvm::InnerReceipt::Composite(_receipt) => {}
+        risc0_zkvm::InnerReceipt::Succinct(receipt) => {
+            println!("Succinct:{}", hex::encode(receipt.get_seal_bytes()));
+        }
+        risc0_zkvm::InnerReceipt::Compact(receipt) => {
+            println!("Compact:{}", hex::encode(receipt.seal));
+        }
+        risc0_zkvm::InnerReceipt::Fake { claim: _ } => {}
+    }
 }
